@@ -58,7 +58,6 @@ print("Ostatné:",pocet_ostatnych)
 
 riadky = int(input("Zadaj počet riadkov"))
 stlpce = int(input("Zadaj počet stlpcov"))
-
 for i in range(0,stlpce):
     for j in range (0,riadky):
         print("*", end="")

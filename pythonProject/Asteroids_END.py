@@ -26,6 +26,10 @@ position_x = 0
 position_y = 0
 zivoty = 3
 
+
+shot = pyglet.media.load("shot.wav", streaming=False)
+explosion = pyglet.media.load("explosion.wav", streaming=False)
+
 def set_anchor_of_image_to_center(img):
     img.anchor_x = img.width // 2
     img.anchor_y = img.height // 2
@@ -163,6 +167,7 @@ class Spaceship(SpaceObject):
         laser.rotation = self.rotation
 
         game_objects.append(laser)
+        shot.play()
 
     """
     Každý frame sa vykoná táto metóda to znamená v našom prípade:
@@ -261,7 +266,9 @@ class Asteroid(SpaceObject):
             ship.reset()
             ship.shield_activate()
             zivoty -= 1
+            explosion.play()
         self.delete()
+
 
     "Metóda ktorá sa vykoná ak dôjde ku kolízii a asteroidu"
 
@@ -270,9 +277,6 @@ class Asteroid(SpaceObject):
         self.delete()
         laser.delete()
         score += 10
-
-
-
 
 """
 Trieda Laser
@@ -344,6 +348,8 @@ class Game:
                                 'Assetss/PNG/Meteors/meteorGrey_small1.png',
                                 'Assetss/PNG/Meteors/meteorGrey_tiny1.png']
         self.ship_life_image = pyglet.image.load('Assetss/PNG/UI/playerLife1_blue.png')
+        self.lose_background = pyglet.image.load("Assetss/Backgrounds/black.png")
+        self.win_background = pyglet.image.load("Assetss/Backgrounds/win.png")
 
     def ship_zivot(self):
         for i in range(zivoty):
@@ -361,13 +367,16 @@ class Game:
 
         # Nastavenie pozadia a prescalovanie
         self.background = pyglet.sprite.Sprite(self.background_image)
+        self.lose_background = pyglet.sprite.Sprite(self.lose_background)
+        self.win_background = pyglet.sprite.Sprite(self.win_background)
         self.background.scale_x = 6
         self.background.scale_y = 4
 
         # Vytvorenie Meteoritov
         self.create_asteroids(count=7)
         # Pridavanie novych asteroidoch každych 10 sekund
-        pyglet.clock.schedule_interval(self.create_asteroids, 10, 1)
+        pyglet.clock.schedule_interval(self.create_asteroids, 4, 1)
+
 
     def create_asteroids(self, dt=0, count=1):
         "Vytvorenie X asteroidov"
@@ -405,6 +414,35 @@ class Game:
 
         self.ship_zivot()
 
+        if score >= 1000:
+            win = pyglet.text.Label(text="Gratulujem Vyhral si", font_size=60, color=(0, 255, 0, 255), x=WIDTH // 2,
+                                        y=HEIGHT // 2, anchor_x='center', anchor_y='center')
+            end = pyglet.text.Label(text="Pre ukončenie stlač ESC", font_size=60, color=(51, 255, 255, 255),
+                                         x=WIDTH // 2,
+                                         y=HEIGHT // 2 - 100, anchor_x='center', anchor_y='center')
+            game_objects.clear()
+            self.window.clear()
+            self.win_background.x = WIDTH // 6
+            self.win_background.y = HEIGHT // 6
+            self.win_background.draw()
+            win.draw()
+            end.draw()
+
+        elif zivoty == 0:
+            prehra = pyglet.text.Label(text="Prehral si", font_size=80, color=(255, 0, 0, 255), x=WIDTH // 2,
+                                     y=HEIGHT // 2, anchor_x='center', anchor_y='center')
+            end = pyglet.text.Label(text="Stlač ESC pre ukončenie", font_size=60, color=(51, 255, 255, 255),
+                                       x=WIDTH // 2,
+                                       y=HEIGHT // 2 - 100, anchor_x='center', anchor_y='center')
+
+            game_objects.clear()
+            self.window.clear()
+            self.lose_background.x = WIDTH // 2
+            self.lose_background.y = HEIGHT // 2
+            self.lose_background.draw()
+            prehra.draw()
+            end.draw()
+
         # Táto časť sa stará o to aby bol prechod cez okraje okna plynulý a nie skokový
         for x_offset in (-self.window.width, 0, self.window.width):
             for y_offset in (-self.window.height, 0, self.window.height):
@@ -438,6 +476,8 @@ class Game:
             pressed_keyboards.add('SPACE')
         if symbol == key.E:
             pressed_keyboards.add("E")
+        if symbol == key.R:
+            pressed_keyboards.add("R")
 
     """
     Event metóda pre spracovanie klávesových výstupov
@@ -458,6 +498,8 @@ class Game:
             pressed_keyboards.discard('SPACE')
         if symbol == key.E:
             pressed_keyboards.discard("E")
+            if symbol == key.R:
+                pressed_keyboards.discard("R")
 
     """
     Update metóda

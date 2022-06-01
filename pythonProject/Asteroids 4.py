@@ -19,15 +19,20 @@ game_objects = []
 batch = pyglet.graphics.Batch() #ZOZNAM SPRITOV PRE ZJEDNODUŠENÉ VYKRESLENIE
 pressed_keyboards = set()       #MNOŽINA ZMAČKNUTÝCH KLÁVES
 
-# Todo: Pridaj KONŠTANTY pre delay na strelbu, laserlifetime, laserspeed
+
 SHOOT_DELAY = 0.5
-LASER_SPEED = 1
-LASER_LIFETIME = 1
+LASER_SPEED = 275
+LASER_LIFETIME = 45
+
+SHIELD_ZIVOT = 3
+POSITION_X = 0
+POSITION_Y = 0
+ROTATION = 0
+
+ZIVOTY = 3
 
 "Score"
 score = 0
-scoreLabel = pyglet.text.Label(text=str(score), font_size=40,x = 1150, y = 760, anchor_x='right', anchor_y='center', batch=batch )
-
 "------------------- FUNKCIE __________________"
 
 """
@@ -137,14 +142,23 @@ class Spaceship(SpaceObject):
     "Konśtruktor"
     def __init__(self, sprite, x ,y):
         super().__init__(sprite,x,y)
-        self.fire = -1 #PREMENNÁ PRE DELAY streľby
-
+        self.laser_load = True
+        self.shield = self.shield_on()
     """
     Metóda zodpovedná za vystrelenie laseru
     """
     def shoot(self):
-        # Todo: Vytvor nový objekt typu Laser a nastav parameter fire na hodnotu delayu
-        pass
+        img = pyglet.image.load('Assetss\PNG\Lasers\laserBlue16.png')
+        set_anchor_of_image_to_center(img)
+
+        laser_x = self.sprite.x + math.cos(self.rotation) * self.radius
+        laser_y = self.sprite.y + math.sin(self.rotation) * self.radius
+
+        laser = Laser(img, laser_x, laser_y)
+        laser.rotation = self.rotation
+
+        game_objects.append(laser)
+
 
     """
     Každý frame sa vykoná táto metóda to znamená v našom prípade:
@@ -179,9 +193,12 @@ class Spaceship(SpaceObject):
 
         "Steľba - SPACE"
         if "SPACE" in pressed_keyboards:
+            self.shoot()
+            self.laser_loaded = False
+            pyglet.clock.schedule_once(self.reload_laser, SHOOT_DELAY)
 
-        # Todo: pridaj akciu po stlačení tlačítka SPACE = shoot
-        #self.fire -= dt # Todo: Je treba odčítať delay z fire
+        if self.shield == True:
+            self.get_position()
 
         "VYBERIE VŠETKY OSTATNE OBJEKTY OKREM SEBA SAMA"
         for obj in [o for o in game_objects if o != self]:
@@ -191,6 +208,9 @@ class Spaceship(SpaceObject):
                 obj.hit_by_spaceship(self)
                 break
 
+        self.get_position()
+
+
     "Metóda zodpovedná za reset pozície rakety"
     def reset(self):
         self.sprite.x = WIDTH // 2
@@ -199,6 +219,28 @@ class Spaceship(SpaceObject):
         self.x_speed = 0
         self.y_speed = 0
 
+    def laser_reload(self, dt):
+        self.laser_load
+
+    def get_position(self):
+        global POSITIONX, POSITIONY, ROTATION
+        POSITIONX = self.sprite.x
+        POSITIONY = self.sprite.y
+        ROTATION = self.rotation
+
+    def shield_on(self):
+        self.shield = True
+        img = pyglet.image.load("Assetss/PNG/Effects/shield2.png")
+        set_anchor_of_image_to_center(img)
+        shield = Shield(img, self.sprite.x, self.sprite.y)
+
+        game_objects.append(shield)
+        pyglet.clock.schedule_once(self.shield_off, SHIELD_ZIVOT)
+        self.get_position()
+
+    def shield_off(self, dt):
+        self.shield = False
+
 
 """
 Trieda Asteroid
@@ -206,22 +248,61 @@ Trieda Asteroid
 class Asteroid(SpaceObject):
     "Metóda ktorá sa vykoná ak dôjde ku kolízii lode a asteroidu"
     def hit_by_spaceship(self, ship):
-        pressed_keyboards.clear()
-        ship.reset()
+        global SHIELD_ZIVOT
+        if ship.shield == False:
+            pressed_keyboards.clear()
+            ship.reset()
+            ship.shield_on()
+            ZIVOTY -= 1
         self.delete()
 
-    "Metóda ktorá sa vykoná ak dôjde ku kolíziiwwwww a asteroidu"
+    "Metóda ktorá sa vykoná ak dôjde ku kolízii a asteroidu"
     def hit_by_laser(self, laser):
-        # Todo: update score + kolizia
-        pass
+        global score
+        self.delete()
+        laser.delete()
+        score += 100
 
 """
 Trieda Laser
 """
 class Laser(SpaceObject):
-    def create_laser(self):
-        laser = pyglet.image.load(random.choice(self.laser_image))
-    pass
+    def __int__(self, sprite, x, y):
+        super().__int__(sprite, x, y)
+        self.laserlifetime = LASER_LIFETIME
+
+
+    def tick(self, dt):
+        super().tick(dt)
+        self.laserlifetime -= 0.5
+        if self.laserlifetime == 0:
+            self.delete()
+
+        self.x_speed = LASER_SPEED = math.cos(self.rotation)
+        self.y_speed = LASER_SPEED = math.sin(self.rotation)
+
+        for obj in [o for o in game_objects if o != self and o != Spaceship]:
+            dis = self.distance(obj)
+            if dis < self.radius + obj.radius:
+                obj.hit_by_laser(self)
+                break
+
+class Shield(SpaceObject):
+    def __init__(self, sprite, x, y):
+        super().__init__(sprite, x, y)
+        self.shield_life = SHIELD_ZIVOT
+
+    def tick(self, dt):
+        global position_x, position_y, rotation
+        super().tick(dt)
+
+        self.sprite.x = POSITION_X
+        self.sprite.y = POSITION_Y
+        self.rotation = ROTATION
+
+        self.shield_life -= dt
+        if self.shield_life <=0:
+            self.delete()
 
 
 """
@@ -246,7 +327,12 @@ class Game:
                            'Assetss/PNG/Meteors/meteorGrey_med1.png',
                            'Assetss/PNG/Meteors/meteorGrey_small1.png',
                            'Assetss/PNG/Meteors/meteorGrey_tiny1.png']
-        self.laser_image = ["Assets/PNG/Lasers/laserRed01.png"]
+        self.ship_life_image = pyglet.image.load('Assetss/PNG/UI/playerLife1_blue.png')
+
+        def ship_life(self):
+            for i in range(ZIVOTY):
+                self.ship_life_image.blit(30 + i * 35, 30)
+            sprite = pyglet.sprite.Sprite(self.ship_life_image, batch=batch)
 
 
     """
@@ -296,6 +382,10 @@ class Game:
         self.window.clear()
         # Vykreslenie pozadia
         self.background.draw()
+        scoreLabel = pyglet.text.Label(text=str(score), font_size=40, x=1150, y=760, anchor_x='right',anchor_y='center')
+        scoreLabel.draw()
+
+        self.ship_life()
 
         "Vykreslenie koliznych koliečok"
         for o in game_objects:
